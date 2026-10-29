@@ -32,4 +32,4 @@ jobs:
         with:
           context: ./task3_docker
           push: true
-          tags: ghcr.io/mulaievaRH/veeam-build-agent:dotnet8
+          tags: ghcr.io/mulaievarh/veeam-build-agent:dotnet8

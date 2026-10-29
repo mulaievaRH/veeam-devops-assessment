@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Check builder image
         run: |
-          IMAGE="ghcr.io/mulaievaRH/veeam-build-agent:dotnet8"
+          IMAGE="ghcr.io/mulaievarh/veeam-build-agent:dotnet8"
           if ! docker buildx imagetools inspect "$IMAGE"; then
             echo "::error::Builder image $IMAGE is not available in GHCR"
             exit 1
@@ -26,7 +26,7 @@ jobs:
     needs: check-image
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/mulaievaRH/veeam-build-agent:dotnet8
+      image: ghcr.io/mulaievarh/veeam-build-agent:dotnet8
 
     defaults:
       run:
