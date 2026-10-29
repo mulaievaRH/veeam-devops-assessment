@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   check-image:
@@ -63,16 +64,18 @@ jobs:
       - name: Publish NuGet package
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
-          NUGET_FEED_URL: ${{ secrets.NUGET_FEED_URL }}
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_FEED_URL: https://nuget.pkg.github.com/mulaievaRH/index.json
+          NUGET_USERNAME: ${{ github.actor }}
+          NUGET_API_KEY: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -z "$NUGET_FEED_URL" ] || [ -z "$NUGET_API_KEY" ]; then
-            echo "::error::NuGet feed credentials are not configured"
-            exit 1
-          fi
-
+          dotnet nuget add source "$NUGET_FEED_URL" \
+            --name github \
+            --username "$NUGET_USERNAME" \
+            --password "$NUGET_API_KEY" \
+            --store-password-in-clear-text
+      
           dotnet nuget push ./packages/*.nupkg \
-            --source "$NUGET_FEED_URL" \
+            --source github \
             --api-key "$NUGET_API_KEY" \
             --skip-duplicate
 
