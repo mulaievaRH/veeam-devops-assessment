@@ -51,7 +51,7 @@ The pipeline runs on:
 3. **Security scan:** Check NuGet dependencies for known vulnerabilities, including transitive dependencies.
 4. **Build:** Build the .NET 8 solution in Release configuration.
 5. **Test:** Run NUnit unit tests.
-6. **Test reporting:** Upload generated `.trx` test results as GitHub Actions artifacts.
+6. **Test result artifacts:** Upload generated `.trx` test results as downloadable GitHub Actions artifacts.
 7. **Pack:** Create a versioned NuGet package.
 8. **Publish:** Push the package to GitHub Packages.
 9. **Notify:** Send the pipeline status to Slack when a webhook is configured.
