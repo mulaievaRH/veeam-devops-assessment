@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/mulaievarh/veeam-build-agent:dotnet8
+      options: --user 0
 
     defaults:
       run:
