@@ -1,37 +1,175 @@
-# Veeam CM/DevOps assessment — working draft
+# Veeam CM/DevOps Technical Assessment
 
-## Task 1: Python
+Solutions for three tasks: Python scripting, a GitHub Actions CI/CD pipeline, and a Docker-based .NET build agent.
 
-Requires Python 3.12+ and Click.
+## Task 1 — Python scripting
+
+A CLI utility that recursively searches text files for a regular expression and counts occurrences.
+
+**Requirements:** Python 3.12+.
+
+Install dependencies:
 
 ```bash
 python -m pip install -r task1_scripts/requirements.txt
-python task1_scripts/search.py ./task2_pipelines 'TestApp'
-python task1_scripts/search.py ./task2_pipelines 'TestApp' -e cs
 ```
 
-By default the script processes a list of known text extensions and extensionless files. This is a practical heuristic, not a guarantee of finding *every* text file. Files with unreadable UTF-8 content are skipped with warnings. Individual read/traversal errors do not cause a nonzero exit status. The count may therefore be incomplete.
+Examples:
 
-## Task 2: GitHub Actions
+```bash
+python task1_scripts/search.py ./task2_pipelines "TestApp"
+python task1_scripts/search.py ./task2_pipelines "TestApp" -e .cs
+python task1_scripts/search.py ./task2_pipelines "error|warning" -e .txt -e .log
+```
 
-The workflow is at `.github/workflows/nuget.yml`. Put this directory structure at the **root** of a GitHub repository, on the `main` branch. It runs on pushes to main, pull requests to main, or manually.
+The script:
 
-The pipeline restores, builds, tests, packs and publishes the provided .NET 8 project. Pull requests do not publish packages. The package version is `1.0.<GitHub run number>`.
+- Accepts a directory and a regex pattern as required arguments.
+- Searches recursively, including nested directories.
+- Prints matches per file and a total count.
+- Supports optional filtering by file extension.
+- Reports invalid paths, invalid regex patterns, and file-reading errors.
 
-Configure repository Actions secrets:
+By default, it processes a predefined set of text file extensions and extensionless files. This is a practical heuristic rather than automatic detection of every possible text format.
 
-- `NUGET_FEED_URL` — target NuGet feed endpoint.
-- `NUGET_API_KEY` — token/API key accepted by that feed.
-- `SLACK_WEBHOOK_URL` — Slack incoming webhook for status notification (optional for local review; when absent, notification is skipped).
+Files that cannot be read as UTF-8 are skipped with warnings. Individual file-reading or traversal errors do not fail the entire execution, so the reported total may be incomplete.
 
-Some private feeds require `dotnet nuget add source` with username/password instead of an API key; adapt authentication to the actual feed before production use.
+## Task 2 — GitHub Actions CI/CD
 
-The `.trx` test file is generated but is not yet published to the GitHub Actions test UI (Nice to Have).
+**Workflow:** `.github/workflows/nuget.yml`
 
-## Task 3: Docker
+The pipeline runs on:
 
-See `task3_docker/README.md` for build/run commands. The Docker image is standalone; the GitHub Actions workflow uses `setup-dotnet` rather than this image. Integrating the image into CI is an optional improvement.
+- Pushes to `main`.
+- Pull requests targeting `main`.
+- Manual execution through GitHub Actions.
 
-## Limitations and validation
+### Pipeline stages
 
-These are working drafts to review together, not a verified production release. The Docker build and GitHub Actions workflow have not been executed in this environment. Actual publishing requires real feed secrets. Run the commands locally and review CI logs before submitting.
+1. **Check builder image:** Verify that the Docker build-agent image is available in GitHub Container Registry (GHCR).
+2. **Restore:** Restore dependencies using `dotnet restore`.
+3. **Security scan:** Check NuGet dependencies for known vulnerabilities, including transitive dependencies.
+4. **Build:** Build the .NET 8 solution in Release configuration.
+5. **Test:** Run NUnit unit tests.
+6. **Test reporting:** Upload generated `.trx` test results as GitHub Actions artifacts.
+7. **Pack:** Create a versioned NuGet package.
+8. **Publish:** Push the package to GitHub Packages.
+9. **Notify:** Send the pipeline status to Slack when a webhook is configured.
+
+### Package publishing
+
+NuGet feed:
+
+```text
+https://nuget.pkg.github.com/mulaievaRH/index.json
+```
+
+Package version format:
+
+```text
+1.0.<GitHub Actions run number>
+```
+
+Publishing happens only on `main`, not on pull requests.
+
+Authentication uses the automatically provided GitHub Actions `GITHUB_TOKEN`. The workflow requires:
+
+```yaml
+permissions:
+  contents: read
+  packages: write
+```
+
+No personal access token is required for publishing to GitHub Packages from this repository.
+
+### Security scan
+
+The pipeline runs:
+
+```bash
+dotnet list TestApp.sln package --vulnerable --include-transitive
+```
+
+This is an informational scan. Vulnerability findings are visible in the workflow logs but do not automatically block publishing.
+
+A production pipeline could introduce severity-based enforcement and a process for reviewing exceptions.
+
+### Notifications
+
+An optional repository secret is supported:
+
+```text
+SLACK_WEBHOOK_URL
+```
+
+When the webhook is missing or sending the notification fails, the workflow emits a warning instead of failing the build.
+
+### CI build environment
+
+The pipeline uses the Docker image from Task 3:
+
+```text
+ghcr.io/mulaievarh/veeam-build-agent:dotnet8
+```
+
+The image defines a non-root `buildagent` user by default. GitHub Actions overrides the container user with `--user 0` because its mounted workspace and runner command directories require compatible write permissions.
+
+## Task 3 — Docker build agent
+
+**Dockerfile:** `task3_docker/Dockerfile`
+
+The image is based on Debian 12 slim and includes:
+
+- .NET SDK 8 (LTS)
+- Git
+- curl
+- CA certificates
+- A non-root `buildagent` user
+
+Package installation and apt cache cleanup are combined to reduce unnecessary image layers and size.
+
+The Dockerfile also runs sanity checks during the image build.
+
+### Build locally
+
+```bash
+docker build -t veeam-build-agent:dotnet8 -f task3_docker/Dockerfile ./task3_docker
+```
+
+### Verify installed tools
+
+```bash
+docker run --rm veeam-build-agent:dotnet8 bash -c "whoami && dotnet --version && git --version && curl --version"
+```
+
+By default, the container runs as `buildagent`.
+
+### Automated image publishing
+
+**Workflow:** `.github/workflows/docker-image.yml`
+
+The workflow builds and publishes the Docker image to GHCR when files in `task3_docker/` or the image-publishing workflow change on `main`. It can also be triggered manually.
+
+Published image:
+
+```text
+ghcr.io/mulaievarh/veeam-build-agent:dotnet8
+```
+
+The image uses a stable `dotnet8` tag, allowing the CI pipeline to consume a centrally maintained build environment.
+
+## Validation
+
+The following checks were completed:
+
+- Python regex matching, per-file counts, recursive search, extension filtering, and error handling.
+- Local Docker image build and verification of the installed tools and non-root user.
+- Successful Docker image publication to GHCR.
+- Successful GitHub Actions pipeline execution, including NuGet package publication.
+- Verification that both the Docker image and the `TestApp` NuGet package are present in GitHub Packages.
+
+### Scope and limitations
+
+This is a technical assessment implementation, not a production-ready delivery platform.
+
+The security scan is informational, the build-agent image uses a mutable version-family tag, and Slack notifications are non-blocking. These choices keep the solution straightforward while demonstrating CI/CD integration, automation, package publishing, and basic security practices.
