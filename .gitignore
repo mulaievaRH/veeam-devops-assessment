@@ -218,3 +218,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+=======
+.venv/
+__pycache__/
+*.pyc
+test_data/
+.vs/
+**/bin/
+**/obj/
+TestResults/
+packages/
